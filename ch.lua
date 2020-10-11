@@ -405,13 +405,14 @@ function main()
             sampAddChatMessage(tag .. "Вы находитесь в списке. Приятного заработка.", 4290744085)
         end
         if autoupdatebool.v then
-            autoupdate(upinfourl, updownloadurl, '##nil', thisScript().path)
+            autoupdate('https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/updatecheck.json', '##nil', 'https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/updatecheck.json')
         end
     --------
         wait(100)
             sampRegisterChatCommand("ch", cmd_ch)
             sampRegisterChatCommand("test", cmd_test)
             sampRegisterChatCommand("test2", cmd_test2)
+            sampRegisterChatCommand("test3", cmd_test3)
         imgui.SwitchContext()
         SwitchColorTheme(mainIni.config.themenumber)
         workwithoutpause(mainIni.config.AntiAFKBoolean)
@@ -503,6 +504,9 @@ function cmd_test2() -- '%{FFDF80%}(.+)%.%{FFFFFF%} Перевозка товаров [Склад №(.
                     else
                         sampAddChatMessage('No matches Price', -1)
                     end
+end
+function cmd_test3()
+    autoupdate('https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/updatecheck.json', '##nil', 'https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/updatecheck.json')
 end
 
 ------ Как в чате появится строка, то..
@@ -1342,41 +1346,57 @@ function closeConnect()
 end
 
 ---------- Autoupdate
-function autoupdate(infourl, downloadurl, prefix, downloadpath)
-    updateinicheck = downloadUrlToFile(infourl, downloadpath,
-        function (id, status)
-            sampAddChatMessage(tag .. 'Проверяю наличие обновлений', 4290744085)
-            if status == dlstatus.STATUS_ENDDOWNLOADDATA and updateinicheck == id then
-                updateIni = inicfg.save(nil, downloadpath)
-                if tonumber(updateIni.info.vers) > script_version then
-                    lua_thread.create(function (prefix)
-                        sampAddChatMessage(tag .. 'Есть обновление. Текующая версия скрипта: '..script_versiontext..'. Новая: '..updateIni.info.verstext, 4290744085)
-                        sampAddChatMessage(tag .. 'Обновляюсь..', 4290744085)
-                        wait(200)
-                        updatefiledownload = downloadUrlToFile(downloadurl, downloadpath, function(id2,status2)
-                            if status2 == dlstatus.STATUS_ENDDOWNLOADDATA and updatefiledownload == id2 then
-                                sampAddChatMessage(tag .. 'Обновление прошло успешно. Перезагружаюсь..', 4290744085)
-                                ifupdatesuccess = true
-                                lua_thread.create(function() wait(500) thisScript():reload() end)
-                            end
-                            if status2 == dlstatus.STATUS_ENDDOWNLOAD and updatefiledownload == id2 then
-                                if ifupdatesuccess == nil then
-                                    sampAddChatMessage(tag .. 'Упс! Что-то пошло не так! Запускаю старую версию.', 4290744085)
-                                    sampAddChatMessage(tag .. 'Просьба написать в личные сообщения группы с хештэгом "#ошибка"!', 4290744085)
-                                    update = false
-                                end
-                            end
-                        end)
-                    end, prefix)
-                else
-                    update = false
-                    sampAddChatMessage(tag .. 'Обновление не требуется.')
-                end
-            else
-                sampAddChatMessage(tag .. 'Не получилось проверить на обновление. Возможно, что-то мешает скрипту.', 4290744085)
-                sampAddChatMessage(tag .. 'Если у вас есть !0AntiStealerByDarkP1xel32.ASI то удалите его и попробуйте снова.', 4290744085)
+function autoupdate(json_url, prefix, url)
+    local dlstatus = require('moonloader').download_status
+    local json = getWorkingDirectory() .. '\\'..thisScript().name..'-version.json'
+    if doesFileExist(json) then os.remove(json) end
+    downloadUrlToFile(json_url, json,
+      function(id, status, p1, p2)
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+          if doesFileExist(json) then
+            local f = io.open(json, 'r')
+            if f then
+              local info = decodeJson(f:read('*a'))
+              updatelink = info.updateurl
+              updateversion = info.latest
+              f:close()
+              os.remove(json)
+              if updateversion ~= thisScript().version then
+                lua_thread.create(function(prefix)
+                  local dlstatus = require('moonloader').download_status
+                  local color = 4290744085
+                  sampAddChatMessage(tag..'Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion, color)
+                  wait(250)
+                  downloadUrlToFile(updatelink, thisScript().path,
+                    function(id3, status1, p13, p23)
+                      if status1 == dlstatus.STATUS_DOWNLOADINGDATA then
+                        print(string.format('Загружено %d из %d.', p13, p23))
+                      elseif status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
+                        print('Загрузка обновления завершена.')
+                        sampAddChatMessage((prefix..'Обновление завершено!'), color)
+                        goupdatestatus = true
+                        lua_thread.create(function() wait(500) thisScript():reload() end)
+                      end
+                      if status1 == dlstatus.STATUSEX_ENDDOWNLOAD then
+                        if goupdatestatus == nil then
+                          sampAddChatMessage(tag..'Обновление прошло неудачно. Запускаю устаревшую версию..', color)
+                          update = false
+                        end
+                      end
+                    end
+                  )
+                  end, prefix
+                )
+              else
                 update = false
+                sampAddChatMessage(tag..'Обновление не требуется. Запускаюсь  текущей версии.')
+              end
             end
+          else
+            sampAddChatMessage(tag..'Не получилось проверить обновление. Напишите в личные сообщения официальной группы')
+            update = false
+          end
         end
+      end
     )
-end
+  end
