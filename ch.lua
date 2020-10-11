@@ -1,5 +1,6 @@
 script_name('Company Pomogator')
 script_author("kreyN")
+script_version("1.0")
 
 require "lib.moonloader"
 require "lib.sampfuncs"
