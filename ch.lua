@@ -1370,7 +1370,7 @@ function autoupdate(json_url, prefix, url)
                   downloadUrlToFile(updatelink, thisScript().path,
                     function(id3, status1, p13, p23)
                         if status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
-                        sampAddChatMessage((prefix..'Обновление завершено!'), color)
+                        sampAddChatMessage(tag..'Обновление завершено!', color)
                         goupdatestatus = true
                         lua_thread.create(function() wait(500) thisScript():reload() end)
                       end
