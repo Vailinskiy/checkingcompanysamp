@@ -1369,10 +1369,7 @@ function autoupdate(json_url, prefix, url)
                   wait(250)
                   downloadUrlToFile(updatelink, thisScript().path,
                     function(id3, status1, p13, p23)
-                      if status1 == dlstatus.STATUS_DOWNLOADINGDATA then
-                        print(string.format('Загружено %d из %d.', p13, p23))
-                      elseif status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
-                        print('Загрузка обновления завершена.')
+                        if status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
                         sampAddChatMessage((prefix..'Обновление завершено!'), color)
                         goupdatestatus = true
                         lua_thread.create(function() wait(500) thisScript():reload() end)
@@ -1389,11 +1386,11 @@ function autoupdate(json_url, prefix, url)
                 )
               else
                 update = false
-                sampAddChatMessage(tag..'Обновление не требуется. Запускаюсь  текущей версии.')
+                sampAddChatMessage(tag..'Обновление не требуется. Запускаюсь с текущей версии.', 4290744085)
               end
             end
           else
-            sampAddChatMessage(tag..'Не получилось проверить обновление. Напишите в личные сообщения официальной группы')
+            sampAddChatMessage(tag..'Не получилось проверить обновление. Напишите в личные сообщения официальной группы', 4290744085)
             update = false
           end
         end
