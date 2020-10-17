@@ -49,6 +49,7 @@ local mainIni = inicfg.load({
         AcceptedProduct = 0,
         MoneyFromSells = 0,
         MoneyFromDeliveries = 0,
+        DisAnyNotfChat = false,
         NotfAboutAnsVK = false,
         NotfAboutMovingVK = false,
         NotfAboutLostConnection = false,
@@ -82,7 +83,10 @@ local upinfourl = "https://raw.githubusercontent.com/Vailinskiy/checkingcompanys
 local updownloadurl = ""
 local autoupdatebool = imgui.ImBool(mainIni.config.AutoUpdate)
 local site = "https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/somename"
+local disableanynotfbool = imgui.ImBool(mainIni.config.DisAnyNotfChat)
 local notfanssound = loadAudioStream('https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/notfhint.wav')
+local notfanssoundprnk = loadAudioStream('https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/prnknotf.mp3') 
+local hellonoviigod = loadAudioStream('https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/noviigod.mp3')
 local NotfAboutAcceptingInCompanyChat = imgui.ImBool(mainIni.config.NotfAboutAcceptingInCC)
 local NotfAns = imgui.ImBool(mainIni.config.NotfAboutAns)
 local NotfAnsVK = imgui.ImBool(mainIni.config.NotfAboutAnsVK)
@@ -129,6 +133,11 @@ local checkingstorage1 = false
 local checkingstorage2 = false
 local tmpvar1 = false
 local tmpvar2 = false
+local tempstring1 = ''
+local tempstring2 = ''
+
+local numEx1, kudaEx1, tovarEx1, kolvoEx1, priceEx1, dostavkaEx1 = 0, '', '', 0, 0, 0
+local numEx2, numskladEx2, deliverypointEx2, prdtypeEx2, amountEx2, priceEx2 = 0, 0, '', '', 0, 0
 ------
 
 local changelog = [[
@@ -453,11 +462,15 @@ function main()
         assert(bool, 'Downloading list users failed.')
         local _, myid = sampGetPlayerIdByCharHandle(playerPed)
         if isAvailableUser(users, sampGetPlayerNickname(myid)) == false then
-            sampAddChatMessage(tag .. "Купите сначала ключ, затем используйте.", 4290744085)
-            sampAddChatMessage(tag .. "После добавления вас в список, перезапустите игру, чтобы все заработало.", 4290744085)
+            if not disableanynotfbool.v then
+                sampAddChatMessage(tag .. "Купите сначала ключ, затем используйте.", 4290744085)
+                sampAddChatMessage(tag .. "После добавления вас в список, перезапустите игру, чтобы все заработало.", 4290744085)
+            end
             thisScript():unload()
         else
-            sampAddChatMessage(tag .. "Вы находитесь в списке. Приятного заработка.", 4290744085)
+            if not disableanynotfbool.v then
+                sampAddChatMessage(tag .. "Вы находитесь в списке. Приятного заработка.", 4290744085)
+            end
         end
         if autoupdatebool.v then
             autoupdate('https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/updatecheck.json', '##nil', 'https://raw.githubusercontent.com/Vailinskiy/checkingcompanysamp/main/updatecheck.json')
@@ -476,6 +489,12 @@ function main()
         SwitchColorTheme(mainIni.config.themenumber)
         workwithoutpause(mainIni.config.AntiAFKBoolean)
         lua_thread.create(vkget)
+        local day = os.date("%d")
+        local month = os.date("%m")
+        if tonumber(day) == 31 and tonumber(month) == 12 or tonumber(day) == 30 and tonumber(month) == 12 then
+            setAudioStreamState(hellonoviigod, 1)
+            setAudioStreamVolume(hellonoviigod, 15)
+        end
     while true do
         wait(0)
         px, py, pz = getCharCoordinates(PLAYER_PED)
@@ -483,6 +502,17 @@ function main()
         pping = sampGetPlayerPing(id)
         -- IMGUI
         imgui.Process = main_window_state.v
+
+
+        local result, button, list, input = sampHasDialogRespond(6405) -- /dialog0 (MsgBox)
+
+        if result then -- если диалог открыт
+            if button == 1 then -- если нажата первая кнопка (Выбрать)
+                sampAddChatMessage("Вы нажали кнопку выбора в диалоге с ID 10", -1)
+            else -- если нажата вторая кнопка (Закрыть)
+                sampAddChatMessage("Вы закрыли диалог с ID 10", -1)
+            end
+        end
     end
 end
 
@@ -504,91 +534,10 @@ function cmd_ch()
     main_window_state.v = not main_window_state.v
 end
 function cmd_test()
-    sampAddChatMessage(pping, -1)
+    sampShowDialog(6405, "Список", "info", "ОК", "Отмена", 0)
+    sampSendDialogResponse(6406, -1, 1, -1)
 end
------- Как в чате появится строка, то..
-function sampev.onServerMessage(color, text)
-        if color == -6732289 and NotfAns.v then
-            setAudioStreamState(notfanssound, 1)
-            setAudioStreamVolume(notfanssound, 100)
-        end
-        if color == -6732289 and NotfAnsVK.v then
-            sendvknotf("Сообщение от администратора:\n" .. text)
-        end
-    if not isPauseMenuActive() and catchingex2.v then
-        if text:find("Новый заказ на бирже доставки товара. Введите /company для просмотра") then
-            sampAddChatMessage("• {FFC800}[Подсказка] {ffffff}Новый заказ на бирже доставки товара. Введите /company для просмотра", -1)
-            sampSendChat('/exchange2')
-        end
-        if text:find("Вы приняли заказ на доставку товара. Теперь он доступен сотрудникам стоянки компании") then
-            amountofaccepteddeliveries.v = amountofaccepteddeliveries.v+amount
-            mainIni.config.AcceptedDeliveries = amountofaccepteddeliveries.v
-            amountofmoneyfromdeliveries.v = amountofmoneyfromdeliveries.v+price*amount
-            mainIni.config.MoneyFromDeliveries = amountofmoneyfromdeliveries.v
-            local tempstring1 = tostring(deliverypoint).." - "..tostring(prdtype).." - "..tonumber(amount)
-            table.insert(mainIni.acceptedlog, tempstring1)
-            inicfg.save(mainIni, directIni)
-            if NotfAboutAcceptingInCompanyChat.v then
-                sampSendChat("/cm [Новый заказ] За доставку: " .. price .. "$, кол-во: " .. amount .. " ед., тип: " .. prdtype..".")
-            end
-            if notfacceptex2vk.v then
-                sendvknotf('Новый заказ /exchange2!\n'..tempstring1)
-            end
-        end
-    end
-    if not isPauseMenuActive() and screnabled.v then
-        if text:find("2 новых заказов на бирже продажи товара. Введите /company для просмотра") then
-            sampAddChatMessage("• {FFC800}[Подсказка] {ffffff}2 новых заказов на бирже продажи товара. Введите /company для просмотра", -1)
-            if sampIsDialogActive() == false then
-                sampSendChat("/exchange1")
-            elseif dialogId ~= 1267 then
-                lua_thread.create(function()
-                    wait(1)
-                    sampCloseCurrentDialogWithButton(0)
-                    wait(pping+5)
-                    sampCloseCurrentDialogWithButton(0)
-                    sampSendChat("/exchange1")
-                end)
-            end
-        end
-        if text:find("Вы забронировали товар для продажи. Ожидайте принятия службы доставки в течение 30 минут") then
-            amountofacceptedorders.v = amountofacceptedorders.v+1
-            amountofacceptedproduct.v = tonumber(kolvo)+amountofacceptedproduct.v
-            mainIni.config.AcceptedNumber = amountofacceptedorders.v
-            mainIni.config.MoneyFromSells = tonumber(price)*tonumber(kolvo) + amountofmoneyfromsells.v
-            mainIni.config.AcceptedProduct = amountofacceptedproduct.v
-            local tempstring1 = tostring(kuda).." - "..tostring(tovar).." - "..tonumber(kolvo).." - $"..tonumber(price)..""
-            table.insert(mainIni.acceptedlog, tempstring1)
-            inicfg.save(mainIni, directIni)
-            if notfacceptex1vk.v then
-                sendvknotf('Новый заказ /exchange1!\n'..tempstring1)
-            end
-        end
-    end
-    if notfoutofprod.v then
-        if text:find("На Ваших складах недостаточно товара для этого заказа") then
-            sendvknotf("Ахтунг!\nЗакончились продукты на складе!")
-        end
-    end
-    if notfdefchat.v then
-        if text:find("- .*%(.*%) %[.*%]") then
-            local plid = text:match("- .*%(.*%) %[(%d+)%]")
-            local _, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
-            if tonumber(plid) ~= id then
-                sendvknotf("Внимание! Новое сообщение в обычный чат!\n\n"..text)
-            end
-        end
-        if text:find("(( .*%[.*%]: .* ))") then
-            local plid = text:match("%{CCCC99%}%(%( .*%[(%d+)%]: .* %)%)")
-            local _, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
-            if plid ~= nil then
-                if tonumber(plid) ~= id then
-                    sendvknotf("Внимание! Новое сообщение в нонРП чат!\n\n"..text)
-                end
-            end
-        end
-    end
-end
+
 
 ------ Как откроется диалог, то..
 function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
@@ -615,10 +564,10 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
         if tmpvar1 then
             for line in text:gmatch("[^\r\n]+") do
                 if line:find("{E3FFCC}%d%.{FFFFFF} Склад") then
-                    local num, numb = line:match("%{E3FFCC%}(%d+)%.%{FFFFFF%} Склад №(%d+) %[.*%]")
-                    if tonumber(numb) == fnumberofstorage.v then
+                    local num, numbb = line:match("%{E3FFCC%}(%d+)%.%{FFFFFF%} Склад №(%d+) %[.*%]")
+                    if tonumber(numbb) == fnumberofstorage.v then
                         sampSendDialogResponse(1241, 1, num-1, -1)
-                    elseif tonumber(numb) ~= fnumberofstorage.v then
+                    elseif tonumber(numbb) ~= fnumberofstorage.v then
                         sendvknotf("Что-то пошло не так. Проверьте правильность введенного номер 1 склада.")
                     end
                 end
@@ -632,8 +581,8 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
         if tmpvar2 then
             for line in text:gmatch("[^\r\n]+") do
                 if line:find("{E3FFCC}%d%.{FFFFFF} Склад") then
-                    local num, numb = line:match("%{E3FFCC%}(%d+)%.%{FFFFFF%} Склад №(%d+) %[.*%]")
-                    if tonumber(numb) == snumberofstorage.v then
+                    local num, numbb = line:match("%{E3FFCC%}(%d+)%.%{FFFFFF%} Склад №(%d+) %[.*%]")
+                    if tonumber(numbb) == snumberofstorage.v then
                         sampSendDialogResponse(1241, 1, num-1, -1)
                     else
                         sendvknotf("Что-то пошло не так. Проверьте правильность введенного номера 2 склада.")
@@ -680,13 +629,15 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                 sendvknotf('Что-то пошло не так. Возможно, неверно введен номер 2 склада')
             end
         end
-        sampSendDialogResponse(1241, 0, 0, -1)
-        lua_thread.create(function()
-            wait(pping+15)
-            sampCloseCurrentDialogWithButton(0)
-        end)
-        tmpvar1 = false
-        tmpvar2 = false
+        if tmpvar1 or tmpvar2 then
+            sampSendDialogResponse(1241, 0, 0, -1)
+            lua_thread.create(function()
+                wait(pping+15)
+                sampCloseCurrentDialogWithButton(0)
+            end)
+            tmpvar1 = false
+            tmpvar2 = false
+        end
     end
 
 
@@ -698,28 +649,51 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
         end)
     end
     if dialogId == 1267 and screnabled.v then
-        --lua_thread.create(function ()
             for line in text:gmatch("[^\r\n]+") do
                 if line:find("{FFDF80}%d+%.{FFFFFF}") then
                     local num, kuda, tovar, kolvo, price, dostavka = line:match("{FFDF80}(%d+).{FFFFFF}%s(.*)%c(.*)%c(%d+)%s%-%s$(%S+)%c$(%S+)")
-                    if dlpointls.v or tonumber(price) >= tonumber(mainIni.config.IgnorePrice) then
-                        if (tovar == prod_slad1 or tovar == prod_slad2 or tovar == prod_slad3 or tovar == prod_slad4) and (tonumber(kolvo) >= min_zakaz.v) and has_value(dlendpointsls, kuda) and (tonumber(price) >= tonumber(min_price.v)) then
-                            if has_value(dlendpointsls, kuda) then
-                                sampSendDialogResponse(1267, 1, num-1, -1)
+                    if dlpointls.v or tonumber(dostavka) >= tonumber(mainIni.config.IgnorePrice) then
+                        if tonumber(dostavka) >= tonumber(min_price.v) then
+                            if (tovar == prod_slad1 or tovar == prod_slad2 or tovar == prod_slad3 or tovar == prod_slad4) and (tonumber(kolvo) >= min_zakaz.v) and has_value(dlendpointsls, kuda) then
+                                if has_value(dlendpointsls, kuda) then
+                                    sampSendDialogResponse(1267, 1, num-1, -1)
+                                    kolvoEx1 = tonumber(kolvo)
+                                    kudaEx1 = kuda
+                                    priceEx1 = tonumber(price)
+                                    tovarEx1 = tovar
+                                    dostavkaEx1 = tonumber(dostavka)
+                                    tempstring1 = kudaEx1.." - "..tovarEx1.." - "..kolvoEx1.." - $"..priceEx1
+                                end
                             end
                         end
                     end
-                    if dlpointsf.v or tonumber(price) >= tonumber(mainIni.config.IgnorePrice) then
-                        if (tovar == prod_slad1 or tovar == prod_slad2 or tovar == prod_slad3 or tovar == prod_slad4) and (tonumber(kolvo) >= min_zakaz.v) and has_value(dlendpointssf, kuda) and (tonumber(price) >= tonumber(min_price.v)) then
-                            if has_value(dlendpointssf, kuda)  then 
-                                sampSendDialogResponse(1267, 1, num-1, -1)
+                    if dlpointsf.v or tonumber(dostavka) >= tonumber(mainIni.config.IgnorePrice) then
+                        if tonumber(dostavka) >= tonumber(min_price.v) then
+                            if (tovar == prod_slad1 or tovar == prod_slad2 or tovar == prod_slad3 or tovar == prod_slad4) and (tonumber(kolvo) >= min_zakaz.v) and has_value(dlendpointssf, kuda) then
+                                if has_value(dlendpointssf, kuda)  then 
+                                    sampSendDialogResponse(1267, 1, num-1, -1)
+                                    kolvoEx1 = tonumber(kolvo)
+                                    kudaEx1 = kuda
+                                    priceEx1 = tonumber(price)
+                                    tovarEx1 = tovar
+                                    dostavkaEx1 = tonumber(dostavka)
+                                    tempstring1 = kudaEx1.." - "..tovarEx1.." - "..kolvoEx1.." - $"..priceEx1
+                                end
                             end
                         end
                     end
-                    if dlpointlv.v or tonumber(price) >= tonumber(mainIni.config.IgnorePrice) then
-                        if (tovar == prod_slad1 or tovar == prod_slad2 or tovar == prod_slad3 or tovar == prod_slad4) and (tonumber(kolvo) >= min_zakaz.v) and has_value(dlendpointslv, kuda) and (tonumber(price) >= tonumber(min_price.v)) then
-                            if has_value(dlendpointslv, kuda) then
-                                sampSendDialogResponse(1267, 1, num-1, -1)
+                    if dlpointlv.v or tonumber(dostavka) >= tonumber(mainIni.config.IgnorePrice) then
+                        if tonumber(dostavka) >= tonumber(min_price.v) then
+                            if (tovar == prod_slad1 or tovar == prod_slad2 or tovar == prod_slad3 or tovar == prod_slad4) and (tonumber(kolvo) >= min_zakaz.v) and has_value(dlendpointslv, kuda) then
+                                if has_value(dlendpointslv, kuda) then
+                                    sampSendDialogResponse(1267, 1, num-1, -1)
+                                    kolvoEx1 = tonumber(kolvo)
+                                    kudaEx1 = kuda
+                                    priceEx1 = tonumber(price)
+                                    tovarEx1 = tovar
+                                    dostavkaEx1 = tonumber(dostavka)
+                                    tempstring1 = kudaEx1.." - "..tovarEx1.." - "..kolvoEx1.." - $"..priceEx1.."\nИтого получите с продажи: "..kolvoEx1*priceEx1
+                                end
                             end
                         end
                     end
@@ -735,7 +709,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                 wait(pping+5)
                 sampCloseCurrentDialogWithButton(0)
             end)
-        --end)
     end
     if dialogId == 1269 and screnabled.v then
         lua_thread.create(function()
@@ -743,35 +716,152 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             sampCloseCurrentDialogWithButton(1)
         end)
     end
-    if dialogId == 1270 and catchingex2.v then
+    if dialogId == 1270 and catchingex2.v then -- /exchange2 dialog
+        print('Dialog 1270 opened with condition catchingex2')
         for line in text:gmatch("[^\r\n]+") do
             if line:find("%{FFDF80%}(%d+)%.%{FFFFFF%}") then
-                local num, numsklad, deliverypoint, prdtype, amount, price = text:match('%{FFDF80%}(%d+)%.%{FFFFFF%} Перевозка товаров%s+%[Склад №(.+) %- (.*)%]%s+(.*)%s+(%d+)%s+%$(.*)')
+                print('If line:find')
+                local num, numsklad, deliverypoint, prdtype, amount, price = text:match('%{FFDF80%}(%d+)%.%{FFFFFF%}%s+Перевозка товаров%s+%[Склад №(.+) %- (.*)%]%s+(.*)%s+(%d+)%s+%$(.*)')
+                print('Successful text:match')
+                if num ~= nil and numsklad ~= nil and deliverypoint ~= nil and prdtype ~= nil and amount ~= nil and price then
+                    print(num)
+                    print(numsklad)
+                    print(deliverypoint)
+                    print(prdtype)
+                    print(amount)
+                    print(price)
+                else
+                    print('smth is nil value')
+                end
                 if tonumber(numsklad) == fnumberofstorage.v or tonumber(numsklad) == snumberofstorage.v then
                     sampSendDialogResponse(1270, 1, num-1, -1)
+                    print('successful condition numsklad == f/s numberofstorage.v')
                 end
-                lua_thread.create(function()
-                    wait(tonumber(pping)+10)
-                    sampCloseCurrentDialogWithButton(0)
-                end)
+                numEx2 = tonumber(num)
+                numskladEx2 = tonumber(numsklad)
+                deliverypointEx2 = deliverypoint
+                prdtypeEx2 = prdtype
+                amountEx2 = tonumber(amount)
+                priceEx2 = tonumber(price)
+                tempstring2 = deliverypointEx2.." - "..prdtypeEx2.." - "..amountEx2.." - "..priceEx2
+                if tempstring2 ~= nil then
+                    print(tempstring2)
+                end
             end
         end
     end
-    if dialogId == 1271 and screnabled.v then
-        lua_thread.create(function()
-            wait(1)
-            sampCloseCurrentDialogWithButton(1)
-        end)
+    if dialogId == 1271 and catchingex2.v then
+        sampSendDialogResponse(1271, -1, 1, -1)
+        sampAddChatMessage("1271 send, going next", -1)
     end
-    if dialogId == 1272 and screnabled.v then
-        lua_thread.create(function()
-            wait(1)
-            sampCloseCurrentDialogWithButton(1)
-        end)
+    if dialogId == 1272 and catchingex2.v then
+        sampSendDialogResponse(1272, 0, 1, _)
+        --sampCloseCurrentDialogWithButton(1)
+        sampAddChatMessage("1272, go check", -1)
     end
 end
 
 
+------ Как в чате появится строка, то..
+function sampev.onServerMessage(color, text)
+    if color == -6732289 and NotfAns.v then
+        local day = os.date("%d")
+        local month = os.date("%m")
+        if tonumber(day) == 1 and tonumber(month) == 4 then
+            setAudioStreamState(notfanssoundprnk, 1)
+            setAudioStreamVolume(notfanssoundprnk, 25)
+        else
+            setAudioStreamState(notfanssound, 1)
+            setAudioStreamVolume(notfanssound, 100)
+        end
+    end
+    if color == -6732289 and NotfAnsVK.v then
+        sendvknotf("Сообщение от администратора:\n" .. text)
+    end
+    if not isPauseMenuActive() and catchingex2.v then
+        if text:find("Вы забронировали товар для продажи. Ожидайте принятия службы доставки в течение 30 минут") then
+            print("После 'Вы забронировали товар'")
+            sampAddChatMessage("• {00CC00}[Успешно] {ffffff}Вы забронировали товар для продажи. Ожидайте принятия службы доставки в течение 30 минут", -1)
+            print("После 'Вы забронировали товар' адд месаге")
+            sampSendChat('/exchange2')
+            print("После /exchange2")
+        end
+    end
+    if text:find("Вы приняли заказ на доставку товара. Теперь он доступен сотрудникам стоянки компании") then
+        if tempstring2 ~= nil then
+        print(tempstring2)
+        end
+            if notfacceptex2vk.v then
+                sendvknotf('Новый заказ /exchange2!\n'..tempstring2)
+            end
+            if NotfAboutAcceptingInCompanyChat.v then
+                if tempstring2 ~= nil then
+                print(tempstring2)
+                end
+                --sampAddChatMessage(tempstring2, -1)
+                --sampSendChat("/cm Взял заказ. За доставку: " .. tempstring2)
+            end
+        amountofaccepteddeliveries.v = amountofaccepteddeliveries.v+tonumber(amountEx2)
+        mainIni.config.AcceptedDeliveries = amountofaccepteddeliveries.v
+        amountofmoneyfromdeliveries.v = amountofmoneyfromdeliveries.v+tonumber(priceEx2)*tonumber(amountEx2)
+        mainIni.config.MoneyFromDeliveries = amountofmoneyfromdeliveries.v
+        table.insert(mainIni.acceptedlog, tempstring2)
+        inicfg.save(mainIni, directIni)
+    end
+    if not isPauseMenuActive() and screnabled.v then
+        if text:find("2 новых заказов на бирже продажи товара. Введите /company для просмотра") then
+            sampAddChatMessage("• {FFC800}[Подсказка] {ffffff}2 новых заказов на бирже продажи товара. Введите /company для просмотра", -1)
+            if sampIsDialogActive() == false then
+                sampSendChat("/exchange1")
+            elseif dialogId ~= 1267 then
+                lua_thread.create(function()
+                    wait(1)
+                    sampCloseCurrentDialogWithButton(0)
+                    wait(pping+5)
+                    sampCloseCurrentDialogWithButton(0)
+                    sampSendChat("/exchange1")
+                end)
+            end
+        end
+    end
+    if text:find("Вы забронировали товар для продажи. Ожидайте принятия службы доставки в течение 30 минут") then
+        if notfacceptex1vk.v then
+            sendvknotf('Новый заказ /exchange1!\n'..tempstring1)
+        end
+        if screnabled.v then
+            amountofacceptedorders.v = amountofacceptedorders.v+1
+            amountofacceptedproduct.v = tonumber(kolvoEx1)+amountofacceptedproduct.v
+            mainIni.config.AcceptedNumber = amountofacceptedorders.v
+            mainIni.config.MoneyFromSells = tonumber(priceEx1)*tonumber(kolvoEx1) + amountofmoneyfromsells.v
+            mainIni.config.AcceptedProduct = amountofacceptedproduct.v
+            table.insert(mainIni.acceptedlog, tempstring1)
+            inicfg.save(mainIni, directIni)
+        end
+    end
+    if notfoutofprod.v then
+        if text:find("На Ваших складах недостаточно товара для этого заказа") then
+            sendvknotf("Ахтунг!\nЗакончились продукты на складе!")
+        end
+    end
+    if notfdefchat.v then
+        if text:find("- .*%(.*%) %[.*%]") then
+            local plid = text:match("- .*%(.*%) %[(%d+)%]")
+            local _, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
+            if tonumber(plid) ~= id then
+                sendvknotf("Внимание! Новое сообщение в обычный чат!\n\n"..text)
+            end
+        end
+        if text:find("(( .*%[.*%]: .* ))") then
+            local plid = text:match("%{CCCC99%}%(%( .*%[(%d+)%]: .* %)%)")
+            local _, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
+            if plid ~= nil then
+                if tonumber(plid) ~= id then
+                    sendvknotf("Внимание! Новое сообщение в нонРП чат!\n\n"..text)
+                end
+            end
+        end
+    end
+end
 
 
 
@@ -811,7 +901,7 @@ SwitchColorTheme = function(theme)
         colors[clr.FrameBgHovered]         = ImVec4(0.18, 0.18, 0.18, 1.00);
         colors[clr.FrameBgActive]          = ImVec4(0.09, 0.12, 0.14, 1.00);
         colors[clr.TitleBg]                = ImVec4(0.14, 0.14, 0.14, 1.00);
-        colors[clr.TitleBgActive]          = ImVec4(0.40, 0.01, 0.55, 1.00);
+        colors[clr.TitleBgActive]          = ImVec4(0.14, 0.14, 0.14, 1.00);
         colors[clr.TitleBgCollapsed]       = ImVec4(0.14, 0.14, 0.14, 1.00);
         colors[clr.MenuBarBg]              = ImVec4(0.20, 0.20, 0.20, 1.00);
         colors[clr.ScrollbarBg]            = ImVec4(0.02, 0.02, 0.02, 0.39);
@@ -842,17 +932,17 @@ SwitchColorTheme = function(theme)
         colors[clr.ModalWindowDarkening]   = ImVec4(0.14, 0.14, 0.14, 0.60);
     elseif theme == 2 then
         colors[clr.Text]                   = ImVec4(1.00, 1.00, 1.00, 1.00);
-        colors[clr.TextDisabled]           = ImVec4(0.50, 0.50, 0.50, 1.00);
+        colors[clr.TextDisabled]           = ImVec4(0.29, 0.29, 0.29, 1.00);
         colors[clr.WindowBg]               = ImVec4(0.14, 0.14, 0.14, 1.00);
         colors[clr.ChildWindowBg]          = colors[clr.WindowBg];
         colors[clr.PopupBg]                = colors[clr.WindowBg];
-        colors[clr.Border]                 = ImVec4(0.43, 0.43, 0.50, 0.50);
-        colors[clr.BorderShadow]           = ImVec4(0.00, 0.00, 0.00, 0.00);
+        colors[clr.Border]                 = ImVec4(0.14, 0.14, 0.14, 1.00);
+        colors[clr.BorderShadow]           = ImVec4(1.00, 1.00, 1.00, 0.10);
         colors[clr.FrameBg]                = ImVec4(0.22, 0.22, 0.22, 1.00);
         colors[clr.FrameBgHovered]         = ImVec4(0.18, 0.18, 0.18, 1.00);
         colors[clr.FrameBgActive]          = ImVec4(0.14, 0.14, 0.14, 1.00);
-        colors[clr.TitleBg]                = ImVec4(0.14, 0.14, 0.14, 1.00);
-        colors[clr.TitleBgActive]          = ImVec4(0.14, 0.14, 0.14, 1.00);
+        colors[clr.TitleBg]                = colors[clr.WindowBg];
+        colors[clr.TitleBgActive]          = colors[clr.WindowBg];
         colors[clr.TitleBgCollapsed]       = ImVec4(0.14, 0.14, 0.14, 1.00);
         colors[clr.MenuBarBg]              = ImVec4(1.00, 0.28, 0.28, 1.00);
         colors[clr.ScrollbarBg]            = ImVec4(0.02, 0.02, 0.02, 0.53);
@@ -866,9 +956,9 @@ SwitchColorTheme = function(theme)
         colors[clr.Button]                 = ImVec4(0.40, 0.01, 0.55, 1.00);
         colors[clr.ButtonHovered]          = ImVec4(0.45, 0.05, 0.60, 1.00);
         colors[clr.ButtonActive]           = ImVec4(0.35, 0.01, 0.50, 1.00);
-        colors[clr.Header]                 = ImVec4(1.00, 0.28, 0.28, 1.00);
-        colors[clr.HeaderHovered]          = ImVec4(0.29, 0.33, 0.98, 0.80);
-        colors[clr.HeaderActive]           = ImVec4(1.00, 0.28, 0.28, 1.00);
+        colors[clr.Header]                 = colors[clr.Button];
+        colors[clr.HeaderHovered]          = colors[clr.ButtonHovered];
+        colors[clr.HeaderActive]           = colors[clr.ButtonActive];
         colors[clr.ResizeGrip]             = ImVec4(1.00, 0.28, 0.28, 1.00);
         colors[clr.ResizeGripHovered]      = ImVec4(0.40, 0.39, 0.38, 0.16);
         colors[clr.ResizeGripActive]       = ImVec4(0.40, 0.39, 0.38, 0.39);
@@ -883,18 +973,18 @@ SwitchColorTheme = function(theme)
         colors[clr.ModalWindowDarkening]   = ImVec4(0.19, 0.19, 0.19, 0.64);
     elseif theme == 3 then
         colors[clr.Text]                   = ImVec4(0.90, 0.90, 0.90, 1.00)
-        colors[clr.TextDisabled]           = ImVec4(0.60, 0.60, 0.60, 1.00)
-        colors[clr.WindowBg]               = ImVec4(0.08, 0.08, 0.08, 1.00)
+        colors[clr.TextDisabled]           = ImVec4(0.29, 0.29, 0.29, 1.00)
+        colors[clr.WindowBg]               = ImVec4(0.14, 0.14, 0.14, 1.00)
         colors[clr.ChildWindowBg]          = colors[clr.WindowBg]
         colors[clr.PopupBg]                = colors[clr.WindowBg]
-        colors[clr.Border]                 = ImVec4(0.70, 0.70, 0.70, 0.40)
-        colors[clr.BorderShadow]           = ImVec4(0.00, 0.00, 0.00, 0.00)
-        colors[clr.FrameBg]                = ImVec4(0.15, 0.15, 0.15, 1.00)
+        colors[clr.Border]                 = ImVec4(0.14, 0.14, 0.14, 1.00)
+        colors[clr.BorderShadow]           = ImVec4(1.00, 1.00, 1.00, 0.10)
+        colors[clr.FrameBg]                = ImVec4(0.22, 0.22, 0.22, 1.00)
         colors[clr.FrameBgHovered]         = ImVec4(0.18, 0.18, 0.18, 1.00)
-        colors[clr.FrameBgActive]          = ImVec4(0.34, 0.34, 0.34, 0.79)
-        colors[clr.TitleBg]                = ImVec4(0.00, 0.69, 0.33, 0.80)
-        colors[clr.TitleBgActive]          = ImVec4(0.00, 0.74, 0.36, 1.00)
-        colors[clr.TitleBgCollapsed]       = ImVec4(0.00, 0.69, 0.33, 0.50)
+        colors[clr.FrameBgActive]          = ImVec4(0.14, 0.14, 0.14, 1.00)
+        colors[clr.TitleBg]                = ImVec4(0.14, 0.14, 0.14, 1.00)
+        colors[clr.TitleBgActive]          = ImVec4(0.14, 0.14, 0.14, 1.00)
+        colors[clr.TitleBgCollapsed]       = ImVec4(0.14, 0.14, 0.14, 1.00)
         colors[clr.MenuBarBg]              = ImVec4(0.00, 0.80, 0.38, 1.00)
         colors[clr.ScrollbarBg]            = ImVec4(0.16, 0.16, 0.16, 1.00)
         colors[clr.ScrollbarGrab]          = ImVec4(0.00, 0.69, 0.33, 1.00)
@@ -904,12 +994,12 @@ SwitchColorTheme = function(theme)
         colors[clr.CheckMark]              = ImVec4(0.00, 0.69, 0.33, 1.00)
         colors[clr.SliderGrab]             = ImVec4(0.00, 0.69, 0.33, 1.00)
         colors[clr.SliderGrabActive]       = ImVec4(0.00, 0.77, 0.37, 1.00)
-        colors[clr.Button]                 = ImVec4(0.00, 0.69, 0.33, 1.00)
-        colors[clr.ButtonHovered]          = ImVec4(0.00, 0.82, 0.39, 1.00)
-        colors[clr.ButtonActive]           = ImVec4(0.00, 0.87, 0.42, 1.00)
-        colors[clr.Header]                 = ImVec4(0.00, 0.69, 0.33, 1.00)
-        colors[clr.HeaderHovered]          = ImVec4(0.00, 0.76, 0.37, 0.57)
-        colors[clr.HeaderActive]           = ImVec4(0.00, 0.88, 0.42, 0.89)
+        colors[clr.Button]                 = ImVec4(0.20, 0.49, 0.34, 1.00)
+        colors[clr.ButtonHovered]          = ImVec4(0.25, 0.54, 0.39, 1.00)
+        colors[clr.ButtonActive]           = ImVec4(0.25, 0.54, 0.39, 1.00)
+        colors[clr.Header]                 = colors[clr.Button]
+        colors[clr.HeaderHovered]          = colors[clr.Button]
+        colors[clr.HeaderActive]           = colors[clr.Button]
         colors[clr.Separator]              = ImVec4(1.00, 1.00, 1.00, 0.40)
         colors[clr.SeparatorHovered]       = ImVec4(1.00, 1.00, 1.00, 0.60)
         colors[clr.SeparatorActive]        = ImVec4(1.00, 1.00, 1.00, 0.80)
@@ -950,7 +1040,7 @@ function imgui.OnDrawFrame()
 
             imgui.SetCursorPos(imgui.ImVec2(0,135))
             imgui.BeginGroup()
-            if imgui.Button(fa.ICON_TABLE .. u8"  Статистика", button_size) then
+            if imgui.Button(fa.ICON_PIE_CHART .. u8"  Статистика", button_size) then
                 menunum = 0
             end
             if imgui.Button(fa.ICON_COGS .. u8"  Настройки", button_size) then
@@ -1043,6 +1133,7 @@ function imgui.OnDrawFrame()
                             imgui.OpenPopup(u8'Ловля заказов')
                         end
                         if imgui.BeginPopupModal(u8"Ловля заказов", true, imgui.WindowFlags.NoMove + imgui.WindowFlags.NoResize + imgui.WindowFlags.AlwaysAutoResize) then
+                            imgui.Separator()
                             imgui.SetCursorPosX(7)
                             if imgui.Checkbox(u8"/exchange1", screnabled) then end
                             imgui.SameLine()
@@ -1057,10 +1148,10 @@ function imgui.OnDrawFrame()
                         imgui.SetCursorPosX(135)
                         if imgui.Checkbox(u8"AAFK", aafkbool) then workwithoutpause(aafkbool.v) end
                         imgui.SameLine()
-                        imgui.TextQuestion(u8"Будьте внимательны, данная функция сохраняется\nв настройках. Т.е. при заходе в следующий раз, она\nавтоматически будет включена.")
+                        imgui.TextQuestion(u8"Будьте внимательны, данная функция сохраняется\nв настройках. Т.е. при заходе в следующий раз, она\nавтоматически будет включена.\n\n!!!ВАЖНАЯ ИНФОРМАЦИЯ!!!\nСкрипт не работает, если включать другие AAFK(К\nпримеру, AAFK от MogAika)")
                         imgui.SameLine()
                         imgui.SetCursorPosX(220)
-                        if imgui.Checkbox(u8"AutoUpdate", autoupdatebool) then end
+                        if imgui.Checkbox(u8"AutoUpdate", autoupdatebool) then mainIni.config.AutoUpdate = autoupdatebool.v; inicfg.save(mainIni, directIni) end
                         imgui.EndGroup()
                 imgui.Separator()
                 imgui.SetCursorPosX(7)
@@ -1120,7 +1211,7 @@ function imgui.OnDrawFrame()
                         imgui.SetCursorPosX(180)
                         imgui.SetCursorPosY(47)
                         imgui.BeginGroup()
-                            imgui.Text(u8"Мин. тариф доставки"); imgui.SameLine(); imgui.TextQuestion(u8"Минимальный тариф для доставки товаров")
+                            imgui.Text(u8"Мин. тариф доставки"); imgui.SameLine(); imgui.TextQuestion(u8"Минимальный тариф для доставки товаров\nСтавьте его БОЛЬШЕ игнорируемой цены")
                             imgui.SetCursorPosX(180)
                             imgui.SetCursorPosY(68)
                             imgui.PushItemWidth(100)
@@ -1134,7 +1225,7 @@ function imgui.OnDrawFrame()
                             end
                         imgui.EndGroup()
                         imgui.Separator()
-                        imgui.CenterText(u8"Цена для забора заказа"); imgui.SameLine(); imgui.TextQuestion(u8'Цена, при которой игнорируется выбор\n"Брать заказы из других городов". Т.е. Если у\nВас стоит фильтр только на ЛВ, но есть заказ\nдля ЛС и цена за его доставку равна или\nбольше, чемуказанная сумма, то заказ из ЛС\nвозьмется. Делайте на 0.01 меньше желаемого.\nПример: вы хотите, чтобы ловилось с 1.20. Значит,\nвам нужно выставить 1.19.')
+                        imgui.CenterText(u8"Цена для забора заказа"); imgui.SameLine(); imgui.TextQuestion(u8'Цена, при которой игнорируется выбор\n"Брать заказы из других городов". Т.е. Если у\nВас стоит фильтр только на ЛВ, есть заказ\nдля ЛС и цена за его доставку равна или\nбольше, чемуказанная сумма, то заказ из ЛС\nвозьмется. Делайте на 0.01 меньше желаемого.\nПример: вы хотите, чтобы ловилось с 1.20. Значит,\nвам нужно выставить 1.19.')
                         imgui.SetCursorPosX(10)
                         imgui.PushItemWidth(150)
                         if imgui.SliderFloat('##IngorePriceDrag', ignorepricefloat, 0.5, 2.0, '%.2f$') then
@@ -1162,6 +1253,16 @@ function imgui.OnDrawFrame()
                             mainIni.config.SecondNumberOfStorage = snumberofstorage.v
                             inicfg.save(mainIni, directIni)
                         end
+                        --[[imgui.SameLine()
+                        if imgui.button(u8"Настройки зафулла") then
+                            imgui.OpenPopup(u8"Настройки зафулла складов")
+                        end
+                        if imgui.BeginPopupModal(u8"Настройки зафулла складов", true, imgui.WindowFlags.NoMove + imgui.WindowFlags.NoResize + imgui.WindowFlags.AlwaysAutoResize) then
+                            imgui.Separator()
+                            imgui.SetCursorPosX(7)
+                            imgui.Checkbox(u8"")
+                            imgui.EndPopup()
+                        end]]
                         imgui.Separator()
                         imgui.CenterText(u8"Типы товаров")
                         imgui.SameLine()
@@ -1216,6 +1317,19 @@ function imgui.OnDrawFrame()
                         end
                         imgui.SameLine()
                         imgui.TextQuestion(u8("Данное уведомление сработает при появлении вопросов\nк вам со стороны администрации."))
+                        imgui.SameLine()
+                        if imgui.Button(u8"Доп. настройки", imgui.ImVec2(105,19)) then
+                            imgui.OpenPopup(u8"Дополнительные настройки уведомлений")
+                        end
+                        if imgui.BeginPopupModal(u8"Дополнительные настройки уведомлений", true, imgui.WindowFlags.NoMove + imgui.WindowFlags.NoResize + imgui.WindowFlags.AlwaysAutoResize) then
+                            imgui.Separator()
+                            imgui.SetCursorPosX(7)
+                            if imgui.Checkbox(u8"Выключить любые уведомления скрипта в чат игры   ", disableanynotfbool) then mainIni.config.DisAnyNotfChat = disableanynotfbool.v; inicfg.save(mainIni, directIni) end
+                            local width = imgui.GetWindowWidth()
+                            imgui.SetCursorPosX(width*0.6-70)
+                            if imgui.Button(u8"Закрыть") then imgui.CloseCurrentPopup() end
+                            imgui.EndPopup()
+                        end
 
                         imgui.Separator()
 
@@ -1250,7 +1364,7 @@ function imgui.OnDrawFrame()
                         end
                         imgui.SameLine(); imgui.TextQuestion(u8('Укажите Ваш VK ID.\nГде его взять? Самый простой способ:\n  • Зайдите в "Настройки" вашего аккаунта\n  • В поле "Адрес страницы" нажмите "Изменить"\n  • Над кнопкой "Сохранить" будет текст - "Номер страницы - (цифры)"\n  • Перепишите эти цифры в поле "VK ID" '))
                         imgui.SameLine()
-                        if imgui.Button(u8"Доп. настройки", smallbutton_sizev2) then
+                        if imgui.Button(u8"Доп. настройки##1", imgui.ImVec2(120, 19)) then
                             imgui.OpenPopup(u8"Дополнительные настройки уведомлений ВКонтакте")
                         end
                         if imgui.BeginPopupModal(u8"Дополнительные настройки уведомлений ВКонтакте", true, imgui.WindowFlags.NoMove + imgui.WindowFlags.NoResize + imgui.WindowFlags.AlwaysAutoResize) then
@@ -1283,7 +1397,7 @@ function imgui.OnDrawFrame()
                             end
                             imgui.EndPopup()
                         end
-                        imgui.EndChild() -- sendvknotf('Ахтунг! Закончились продукты на складе!')
+                        imgui.EndChild()
             end
         imgui.End()
         imgui.PopStyleVar()
@@ -1554,19 +1668,25 @@ function autoupdate(json_url, prefix, url)
                 lua_thread.create(function(prefix)
                   local dlstatus = require('moonloader').download_status
                   local color = 4290744085
-                  sampAddChatMessage(tag..'Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion, color)
+                  if not disableanynotfbool.v then
+                    sampAddChatMessage(tag..'Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion, color)
+                  end
                   wait(250)
                   downloadUrlToFile(updatelink, thisScript().path,
                     function(id3, status1, p13, p23)
                         if status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
-                        sampAddChatMessage((prefix..'Обновление завершено!'), color)
+                        if not disableanynotfbool.v then
+                            sampAddChatMessage(tag..'Обновление завершено!', color)
+                        end
                         goupdatestatus = true
                         lua_thread.create(function() wait(500) thisScript():reload() end)
                       end
                       if status1 == dlstatus.STATUSEX_ENDDOWNLOAD then
                         if goupdatestatus == nil then
-                          sampAddChatMessage(tag..'Обновление прошло неудачно. Запускаю устаревшую версию..', color)
-                          update = false
+                            if not disableanynotfbool.v then
+                                sampAddChatMessage(tag..'Обновление прошло неудачно. Запускаю устаревшую версию..', color)
+                            end
+                            update = false
                         end
                       end
                     end
@@ -1575,11 +1695,15 @@ function autoupdate(json_url, prefix, url)
                 )
               else
                 update = false
-                sampAddChatMessage(tag..'Обновление не требуется. Запускаюсь с текущей версии.', 4290744085)
+                if not disableanynotfbool.v then
+                    sampAddChatMessage(tag..'Обновление не требуется. Запускаюсь с текущей версии.', 4290744085)
+                end
               end
             end
           else
-            sampAddChatMessage(tag..'Не получилось проверить обновление. Напишите в личные сообщения официальной группы', 4290744085)
+            if not disableanynotfbool.v then
+                sampAddChatMessage(tag..'Не получилось проверить обновление. Напишите в личные сообщения официальной группы', 4290744085)
+            end
             update = false
           end
         end
