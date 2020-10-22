@@ -12,7 +12,6 @@ local dlstatus = require ('moonloader').download_status
 local as_action = require('moonloader').audiostream_state
 local memory = require "memory"
 local imgui = require 'imgui'
-local vkeys = require 'vkeys'
 local inicfg = require 'inicfg'
 local encoding = require 'encoding'
 local fa = require 'faIcons'
@@ -592,8 +591,7 @@ function cmd_ch()
     main_window_state.v = not main_window_state.v
 end
 function cmd_test()
-    goorderprods1 = true
-    sampSendChat('/company')
+    
 end
 
 
@@ -1325,7 +1323,7 @@ function imgui.OnDrawFrame()
             imgui.Link('https://vk.com/companyhelper', u8('Company Helper в ВК'))
             imgui.SetCursorPosY(340)
             imgui.SetCursorPosX(100 - calc2.x/2)
-            imgui.Link('https://blast.hk', u8('Тема на BlastHack'))
+            imgui.Link('https://www.blast.hk/threads/67128/', u8('Тема на BlastHack'))
             imgui.EndGroup()
             imgui.SetCursorPos(imgui.ImVec2(205, 5))
             if menunum == 0 then
